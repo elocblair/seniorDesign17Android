@@ -4,26 +4,20 @@ import android.Manifest;
 import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
-import android.media.MediaScannerConnection;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
-import android.os.Message;
-import android.os.RemoteException;
-import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
-import android.content.Context;
-import android.content.Intent;
-import android.util.Log;
 
-import java.io.FileOutputStream;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -31,9 +25,9 @@ import java.util.Date;
 
 public class MainActivity extends AppCompatActivity {
 
-    BleService bleService;
+    public BleService bleService;
     boolean isBound = false;
-    boolean fileCreated = false;
+    //boolean fileCreated = false;
     boolean writeDebounce = false;
     String fileName = "trialData_";
     String randomID = "0001_";
@@ -41,231 +35,164 @@ public class MainActivity extends AppCompatActivity {
     String string = "Hello World!";
     String dateTime = DateFormat.getDateTimeInstance().format(new Date());
     String fileType = ".txt";
-    ArrayList<String> hipData = new ArrayList<String>();
-    ArrayList<String>  kneeData= new ArrayList<String>();
-    ArrayList<String>  ankleData= new ArrayList<String>();
-    int hipCount = 0;
-    int kneeCount = 0;
-    int ankleCount = 0;
-    String fullPath = path+fileName+randomID+dateTime+fileType;
+    //ArrayList<String> chestData = new ArrayList<String>();
+    String fullPath = path + fileName + randomID + dateTime + fileType;
     int scanCount = 20;
-    int footClickCount = 0;
-    int kneeClickCount = 0;
-    int hipClickCount = 0;
-    boolean fireflyFound = false;
+    int[] clickCount = {0,0,0,0};
+    //boolean fireflyFound = false;
+    final static String tag="MainActivity";
 
+    //open the ble binder
 
     private ServiceConnection mServiceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
+            Log.v(tag,"Opening BLE Binder");
             BleService.BleBinder binder = (BleService.BleBinder) service;
             bleService = binder.getService();
             isBound = true;
             bleService.initializeBle();
-            //bleService.scanner.startScan(bleService.mScanCallback);
+            Log.v(tag,"BLE binder initialized");
         }
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
+            Log.v(tag,"Disconnecting BLE binder");
             bleService = null;
             isBound = false;
         }
     };
-
-
-
-    private static final String TAG = "Cole";
-
-
+//some "global' variables and stuff
     Handler timerHandler = new Handler();
     Status statusVariables = new Status();
-    FireflyCommands fireflyCommands = new FireflyCommands();
-    SensorUI hipUI;
-    SensorUI kneeUI;
-    SensorUI ankleUI;
-
+    SensorUI chestUI;
+    SensorUI bicepUI;
+    SensorUI wristUI;
+    SensorUI handUI;
     private static Context context;
-
-    //BLE connections for the firefly
-    private FloatingActionButton stimButton;
-
-    //ble connections for the sensor
     private TextView sensorStatus;
     private static final int PERMISSION_REQUEST_COARSE_LOCATION = 1;
 
+    //auto android stuff, link GUI elements to code functions, start stuff, request permissions, etc
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        Log.v(tag,"Opening app");
         super.onCreate(savedInstanceState);
 
-        if(savedInstanceState!= null){
+        if (savedInstanceState != null) {
 
-        }
-        else{
+        } else {
+            Log.v(tag,"Start from scratch, assign all GUI elements");
             // all UI components for main activity
             setContentView(R.layout.activity_main);
+            int[] rightPBChest={ R.id.progressBarChestXRight, R.id.progressBarChestRightY, R.id.progressBarChestRightZ};
+            int[] leftPBChest={R.id.progressBarChestXLeft, R.id.progressBarChestLeftY, R.id.progressBarChestLeftZ};
+            int[] rightSBChest={R.id.seekBarChestXRight, R.id.seekBarChestYRight, R.id.seekBarChestZRight};
+            int[] leftSBChest={R.id.seekBarChestXLeft, R.id.seekBarChestYLeft, R.id.seekBarChestZLeft};
+            int[] rightTVChest={R.id.chestAngleXRight,R.id.chestAngleYRight,R.id.chestAngleZRight};
+            int[] leftTVChest={ R.id.chestAngleXLeft,  R.id.chestAngleYLeft,  R.id.chestAngleZLeft};
+            chestUI = new SensorUI(R.id.chestButton,rightPBChest, leftPBChest, rightSBChest , leftSBChest ,rightTVChest, leftTVChest,R.id.relativeHip,  this);
+            chestUI.green = R.drawable.chestgreen;
+            chestUI.yellow = R.drawable.chestyellow;
+            chestUI.white = R.drawable.chestwhite;
 
-            hipUI = new SensorUI(R.id.upperLegButton, R.id.progressBarTopRight, R.id.progressBarTopLeft, R.id.seekBarTopRight, R.id.seekBarTopLeft,
-                    R.id.topAngle, R.id.topAngleL,R.id.relativeHip, this );
-            hipUI.leftPB.setRotation(180);
+            int[] rightPBBicep={R.id.progressBarBicepXRight, R.id.progressBarBicepRightY, R.id.progressBarBicepRightZ};
+            int[] leftPBBicep={R.id.progressBarBicepXLeft, R.id.progressBarBicepLeftY, R.id.progressBarBicepLeftZ};
+            int[] rightSBBicep={R.id.seekBarBicepXRight, R.id.seekBarBicepYRight, R.id.seekBarBicepZRight};
+            int[] leftSBBicep={R.id.seekBarBicepXLeft, R.id.seekBarBicepYLeft, R.id.seekBarBicepZLeft};
+            int[] rightTVBicep={R.id.bicepAngleXRight, R.id.bicepAngleYRight, R.id.bicepAngleZRight};
+            int[] leftTVBicep={R.id.bicepAngleXLeft, R.id.bicepAngleYLeft, R.id.bicepAngleZLeft};
+            bicepUI=new SensorUI(R.id.bicepButton, rightPBBicep, leftPBBicep, rightSBBicep, leftSBBicep, rightTVBicep, leftTVBicep, R.id.relativeHip, this);
+            bicepUI.green = R.drawable.bicepgreen;
+            bicepUI.yellow = R.drawable.bicepyellow;
+            bicepUI.white = R.drawable.bicepwhite;
 
-            hipUI.green = R.drawable.hipgreen;
-            hipUI.yellow = R.drawable.hipyellow;
-            hipUI.white = R.drawable.hipwhite;
+            int[] rightPBWrist={R.id.progressBarWristXRight, R.id.progressBarWristRightY, R.id.progressBarWristRightZ};
+            int[] leftPBWrist={R.id.progressBarWristXLeft, R.id.progressBarWristLeftY, R.id.progressBarWristLeftZ};
+            int[] rightSBWrist={R.id.seekBarWristXRight, R.id.seekBarWristYRight, R.id.seekBarWristZRight};
+            int[] leftSBWrist={R.id.seekBarWristXLeft, R.id.seekBarWristYLeft, R.id.seekBarWristZLeft};
+            int[] rightTVWrist={R.id.wristAngleXRight, R.id.wristAngleYRight, R.id.wristAngleZRight};
+            int[] leftTVWrist={R.id.wristAngleXLeft, R.id.wristAngleYLeft, R.id.wristAngleZLeft};
+            wristUI=new SensorUI(R.id.wristButton, rightPBWrist, leftPBWrist, rightSBWrist, leftSBWrist, rightTVWrist, leftTVWrist, R.id.relativeHip, this);
+            wristUI.green = R.drawable.wristgreen;
+            wristUI.yellow = R.drawable.wristyellow;
+            wristUI.white = R.drawable.wristwhite;
 
+            int[] rightPBHand={R.id.progressBarHandXRight, R.id.progressBarHandRightY, R.id.progressBarHandRightZ};
+            int[] leftPBHand={R.id.progressBarHandXLeft, R.id.progressBarHandLeftY, R.id.progressBarHandLeftZ};
+            int[] rightSBHand={R.id.seekBarHandXRight, R.id.seekBarHandYRight, R.id.seekBarHandZRight};
+            int[] leftSBHand={R.id.seekBarHandXLeft, R.id.seekBarHandYLeft, R.id.seekBarHandZLeft};
+            int[] rightTVHand={R.id.handAngleXRight, R.id.handAngleYRight, R.id.handAngleZRight};
+            int[] leftTVHand={R.id.handAngleXLeft, R.id.handAngleYLeft, R.id.handAngleZLeft};
+            handUI=new SensorUI(R.id.handButton, rightPBHand, leftPBHand, rightSBHand, leftSBHand, rightTVHand, leftTVHand, R.id.relativeHip, this);
+            handUI.green = R.drawable.handgreen;
+            handUI.yellow = R.drawable.handyellow;
+            handUI.white = R.drawable.handwhite;
 
-            kneeUI = new SensorUI(R.id.lowerLegButton, R.id.progressBarMidRight, R.id.progressBarMidLeft, R.id.seekBarMidRight,R.id.seekBarMidLeft,
-                    R.id.midAngle, R.id.midAngleL, R.id.relativeKnee, this);
-            kneeUI.leftPB.setRotation(180);
-
-            kneeUI.green = R.drawable.kneegreen;
-            kneeUI.yellow = R.drawable.kneeyellow;
-            kneeUI.white = R.drawable.kneewhite;
-
-            ankleUI = new SensorUI(R.id.footButton,R.id.progressBarBottomRight,R.id.progressBarBottomLeft,R.id.seekBarBottomRight,R.id.seekBarBottomLeft,
-                    R.id.bottomAngle,R.id.bottomAngleL, R.id.relativeAnkle, this);
-            ankleUI.leftPB.setRotation(180);
-
-            ankleUI.green = R.drawable.anklegreen;
-            ankleUI.yellow = R.drawable.ankleyellow;
-            ankleUI.white = R.drawable.anklewhite;
-
-            stimButton = (FloatingActionButton) findViewById(R.id.stim_buton);
             sensorStatus = (TextView) findViewById(R.id.SensorStatus);
-
-            stimButton.bringToFront();
-            stimButton.setOnLongClickListener(new View.OnLongClickListener(){
-                  @Override
-                  public boolean onLongClick(View v){
-                      if(bleService.fireflyFound){
-                          //bleService.sendMessageForPCM("disconnect pcm");
-                          bleService.fireflyGatt.disconnect();
-                          bleService.fireflyGatt.close();
-                          bleService.fireflyGatt = null;
-                          setSensorStatus("PCM Disconnected");
-                          stimButton.setImageResource(R.drawable.ic_flash_off_black_24dp);
-                          bleService.fireflyFound = false;
-                      }
-                      return true;
-                  }
-            });
-
-            requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST_COARSE_LOCATION);
-            if(checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
-            {
-                Log.v(TAG, "permission granted");
-                writeFile();
+            requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST_COARSE_LOCATION);
+            if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                Log.v(tag, "File writing permission granted");
+                //writeFile();
             }
+            Log.v(tag,"Make the BLE thing available to do stuff");
             registerReceiver(broadcastReceiver, new IntentFilter("bleService"));
         }
 
     }
 
+    //close BT connections on destroy
     @Override
     protected void onDestroy() {
+        Log.v(tag,"Close app, destroy stuff, close BT connections");
         super.onDestroy();
-        if(bleService.fireflyGatt != null) {
-            bleService.fireflyGatt.disconnect();
-            bleService.fireflyGatt.close();
-            bleService.fireflyGatt = null;
+        for(int i=0;i<bleService.gattArray.length;i++) {
+            if (bleService.gattArray[i] != null) {
+                bleService.gattArray[i].disconnect();
+                bleService.gattArray[i].close();
+                bleService.gattArray[i] = null;
+            }
         }
-        if(bleService.hipGatt != null) {
-            bleService.hipGatt.disconnect();
-            bleService.hipGatt.close();
-            bleService.hipGatt = null;
-        }
-        if(bleService.kneeGatt != null) {
-            bleService.kneeGatt.disconnect();
-            bleService.kneeGatt.close();
-            bleService.kneeGatt = null;
-        }
-        if(bleService.ankleGatt != null) {
-            bleService.ankleGatt.disconnect();
-            bleService.ankleGatt.close();
-            bleService.ankleGatt = null;
-        }
-        Log.v("onDestroy", "DESTROYED");
+        Log.v(tag, "DESTROYED");
     }
+
+    //log that it stopped
     @Override
     protected void onStop() {
-
         super.onStop();
-        writeFileAtStop("hip = ", hipUI);
-        writeFileAtStop("knee = ", kneeUI);
-        writeFileAtStop("ankle = ", ankleUI);
-        Log.v("onStop", "STOPPED");
-    }
-    @Override
-    protected void onPause(){
-        super.onPause();
-
+        Log.v(tag, "on stop, STOPPED");
     }
 
-    public void onRestoreInstanceState(Bundle savedInstanceState){
-        super.onRestoreInstanceState(savedInstanceState);
-
-    }
-
-    public void onSaveInstanceState(Bundle savedInstanceState){
+    //deleted extraneous methods
+    //something about restoring
+    public void onSaveInstanceState(Bundle savedInstanceState) {
         super.onSaveInstanceState(savedInstanceState);
         int restore = 42;
         savedInstanceState.putInt("SOMETHING", restore);
     }
 
-    //stim button clicked
-    public void stimClicked(View v)
-    {
-        //todo bleService.fireflyGatt will always be null now the fireflyGatt instance is only in the pcmService
-        if(bleService.fireflyGatt != null){
-            if(!statusVariables.stimming) {
-                statusVariables.stimming = true;
-                triggerFirefly(fireflyCommands.startStim);
-                timerHandler.postDelayed(fireflyStop, 1000);
-                timerHandler.postDelayed(fireflyDebounce,5000);
-                //bleService.sendMessageForPCM("stimulate");
-                writeFile();
-            }
-        }
-        else{
-           // bleService.sendMessageForPCM("button clicked");
-            bleService.searchingHip = false;
-            bleService.searchingKnee = false;
-            bleService.searchingAnkle = false;
-            bleService.searchingPCM = true;
-            setSensorStatus("Searching for PCM");
-            bleService.scanner.startScan(bleService.mScanCallback);
-            scanCount = 20;
-            bleService.scanning = true;
-            timerHandler.postDelayed(scanStop, 1000);
-        }
-    }
-
+    //handling permissions
     @Override
     public void onRequestPermissionsResult(int requestCode,
-                                           String permissions[], int[] grantResults)
-    {
-        switch (requestCode)
-        {
-            case PERMISSION_REQUEST_COARSE_LOCATION:
-            {
-                if ( grantResults[0] == PackageManager.PERMISSION_GRANTED)
-                {
-                    Log.d(TAG, "coarse location permission granted");
+                                           String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case PERMISSION_REQUEST_COARSE_LOCATION: {
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    Log.d(tag, "coarse location permission granted");
+                    Log.v(tag,"Start the BT scanner fr this time");
                     Intent bleIntent = new Intent(this, BleService.class);
                     startService(bleIntent);
                     bindService(bleIntent, mServiceConnection, this.BIND_AUTO_CREATE);
-                }
-                else
-                {
+                } else {
+                    Log.v(tag,"didn't give us BT permissions, how clever");
                     final AlertDialog.Builder builder = new AlertDialog.Builder(this);
                     builder.setTitle("Functionality limited");
                     builder.setMessage("Since location access has not been granted, this app will not be able to discover beacons when in the background.");
                     builder.setPositiveButton(android.R.string.ok, null);
-                    builder.setOnDismissListener(new DialogInterface.OnDismissListener()
-                    {
+                    builder.setOnDismissListener(new DialogInterface.OnDismissListener() {
 
                         @Override
-                        public void onDismiss(DialogInterface dialog)
-                        {
+                        public void onDismiss(DialogInterface dialog) {
                             //add code to handle dismiss
                         }
 
@@ -278,105 +205,63 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public static Context getAppContext(){
+    //is this necessary?
+    public static Context getAppContext() {
+        Log.v(tag,"You wanted context you got context");
         return MainActivity.context;
     }
-    public void checkValue(final int value, final SensorUI sensor){
-        if (value > sensor.rightSB.getProgress() | (value*-1) > sensor.leftSB.getProgress()){
-            if(!statusVariables.stimming) {
-                statusVariables.stimming = true;
-                Log.v(TAG, "Start command");
-                triggerFirefly(fireflyCommands.startStim);
-                timerHandler.postDelayed(fireflyStop, 1000);
-                timerHandler.postDelayed(fireflyDebounce,5000);
-            }
-        }
-    }
     //GAUGE
-    public void setGaugeValue(final int value, final SensorUI sensor) {
+
+    //set progress bar axis
+    public void setGaugeValue(final int value, final SensorUI sensor, final int axis) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                if(value < 0 & value > -90) {
-                    sensor.leftPB.setProgress(-1*value);
-                    sensor.rightPB.setProgress(0);
-                    if(sensor == hipUI){
-                        hipData.add( Integer.toString(value) + " ");
-                        //hipCount++;
-                        hipData.add(Long.toString(System.currentTimeMillis()) + "\n");
-                        //hipCount++;
-                    }
-                    if(sensor == kneeUI){
-                        kneeData.add(Integer.toString(value)+ " ") ;
-                        //kneeCount++;
-                        kneeData.add(Long.toString(System.currentTimeMillis()) + "\n");
-                        //kneeCount++;
-                    }
-                    if(sensor == ankleUI){
-                        ankleData.add(Integer.toString(value)+ " ");
-                        //ankleCount++;
-                        ankleData.add(Long.toString(System.currentTimeMillis()) + "\n");
-                        //ankleCount++;
-                    }
-                    //writeFile(value, sensor);
-                }
-                else if(value > 0 & value < 90 ){
-                    sensor.leftPB.setProgress(0);
-                    sensor.rightPB.setProgress(value);
-                    if(sensor == hipUI){
-                        hipData.add( Integer.toString(value) + " ");
-                        //hipCount++;
-                        hipData.add(Long.toString(System.currentTimeMillis()) + "\n");
-                        //hipCount++;
-                    }
-                    if(sensor == kneeUI){
-                        kneeData.add(Integer.toString(value)+ " ") ;
-                        //kneeCount++;
-                        kneeData.add(Long.toString(System.currentTimeMillis()) + "\n");
-                        //kneeCount++;
-                    }
-                    if(sensor == ankleUI){
-                        ankleData.add(Integer.toString(value)+ " ");
-                        //ankleCount++;
-                        ankleData.add(Long.toString(System.currentTimeMillis()) + "\n");
-                        //ankleCount++;
-                    }
-                    //writeFile(value, sensor);
-                }
-                if (value > sensor.rightSB.getProgress() & value < 90 ){
-                    sensor.relativeLayout.setBackgroundColor(Color.parseColor("#008542"));
-                    if(!writeDebounce){
-                        //writeFile(value, sensor);
-                        writeDebounce = true;
-                        timerHandler.postDelayed(debounceWrite, 1000);
-                    }
+                //Log.v(tag,"Set Gauge value, value is "+value+" and the axis is "+axis);
+                if (value < 0 & value > -90) {
+                    sensor.progressBars[1][axis].setProgress(-1*value);
+                    sensor.progressBars[0][axis].setProgress(0);
 
+                    /*if (sensor == chestUI) {
+                        chestData.add(Integer.toString(value) + " ");
+                        chestData.add(Long.toString(System.currentTimeMillis()) + "\n");
+                    }*/
+
+                } else if (value > 0 & value < 90) {
+                    sensor.progressBars[1][axis].setProgress(0);
+                    sensor.progressBars[0][axis].setProgress(value);
+                    /*if (sensor == chestUI) {
+                        chestData.add(Integer.toString(value) + " ");
+                        chestData.add(Long.toString(System.currentTimeMillis()) + "\n");
+                    }*/
                 }
-                if ( (value*-1) > sensor.leftSB.getProgress() & (value*-1) < 90 ){
-                    sensor.relativeLayout.setBackgroundColor(Color.parseColor("#008542"));
-                    if(!writeDebounce){
-                        //writeFile(value, sensor);
-                        writeDebounce = true;
-                        timerHandler.postDelayed(debounceWrite, 1000);
-                    }
+                /*//cool glowy you did it color
+                if (value > sensor.seekBars[0][axis].getProgress() & value < 90) {
+                    Log.v(tag,"Activate stim, value higher than goals set positive");
+                    sensor.setSensorBackgroundColor("#008542");
 
                 }
 
-                if (value < sensor.rightSB.getProgress() & (value*-1) < sensor.leftSB.getProgress()){
-
-                    sensor.relativeLayout.setBackgroundColor(Color.parseColor("#404040"));
-                    if(sensor == kneeUI){
-                        sensor.relativeLayout.setBackgroundColor(Color.parseColor("#333333"));
-                    }
+                //cool glowy you did it color
+                if ((value * -1) > sensor.seekBars[1][axis].getProgress() & (value * -1) < 90) {
+                    Log.v(tag,"Activate stim, value higher than goals set negative");
+                    sensor.setSensorBackgroundColor("#008542");
 
                 }
-                if(value >= 0 ){
-                    sensor.rightTV.setText(Integer.toString(value) + "/" + Integer.toString(sensor.rightSB.getProgress()));
-                    sensor.leftTV.setText("0/"+ Integer.toString(sensor.leftSB.getProgress()));
+//normal color
+                if (value < sensor.seekBars[0][axis].getProgress() & (value * -1) < sensor.seekBars[1][axis].getProgress()) {
+                    sensor.setSensorBackgroundColor("#404040");
+
+                }*/
+                //now display values
+                //ignore seekbar values now
+                if (value >= 0) {
+                    sensor.textViews[0][axis].setText(Integer.toString(value));// + "/" + Integer.toString(sensor.seekBars[0][axis].getProgress()));
+                    sensor.textViews[1][axis].setText("0/");// + Integer.toString(sensor.seekBars[1][axis].getProgress()));
                 }
-                if(value <= 0) {
-                    sensor.leftTV.setText(Integer.toString(-1*value) + "/" + Integer.toString(sensor.leftSB.getProgress()));
-                    sensor.rightTV.setText("0/" + Integer.toString(sensor.rightSB.getProgress()));
+                if (value <= 0) {
+                    sensor.textViews[1][axis].setText(Integer.toString(-1 * value));// + "/" + Integer.toString(sensor.seekBars[1][axis].getProgress()));
+                    sensor.textViews[0][axis].setText("0/" );//+ Integer.toString(sensor.seekBars[0][axis].getProgress()));
                 }
             }
         });
@@ -384,8 +269,7 @@ public class MainActivity extends AppCompatActivity {
 
 
     //SENSOR STATUS TEXT
-    public void setSensorStatus(final String message)
-    {
+    public void setSensorStatus(final String message) {
         //final String msg = "Sensor " + message;
         runOnUiThread(new Runnable() {
             @Override
@@ -396,43 +280,35 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
-    public void triggerFirefly(byte[] onOff)
-    {
-        if(bleService.fireflyFound){
-            bleService.FIREFLY_CHARACTERISTIC2.setValue(onOff);
-            boolean b = bleService.fireflyGatt.writeCharacteristic(bleService.FIREFLY_CHARACTERISTIC2);
-            Log.i(TAG, "firefly write status = " + b);
-        }
 
-    }
-    Runnable fireflyStop = new Runnable() {
-        @Override
-        public void run() {
-            if(bleService.fireflyFound){
-                Log.v(TAG, "Stop command");
-                triggerFirefly(fireflyCommands.stopStim);
-            }
-        }
-    };
-
+    //scan for BT devices function, store connections in bleservice object
     Runnable scanStop = new Runnable() {
         @Override
         public void run() {
-            if(bleService.scanning){
-                if(scanCount > 0){
+            if (bleService.scanning) {
+                Log.v(tag,"Scanning for BT atm");
+                if (scanCount > 0) {
                     scanCount--;
                     timerHandler.postDelayed(scanStop, 1000);
-                }
-                else if(scanCount == 0){
+                } else if (scanCount == 0) {
                     bleService.scanner.stopScan(bleService.mScanCallback);
                     bleService.scanning = false;
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
                             setSensorStatus("Scan Timeout");
-                            if(bleService.hipGatt == null){hipUI.connect.setBackgroundResource(R.drawable.hipwhite);}
-                            if(bleService.kneeGatt ==  null){kneeUI.connect.setBackgroundResource(R.drawable.kneewhite);}
-                            if(bleService.ankleGatt ==  null){ankleUI.connect.setBackgroundResource(R.drawable.anklewhite);}
+                            if (bleService.gattArray[0] == null) {
+                                chestUI.connect.setBackgroundResource(R.drawable.chestwhite);
+                            }
+                            if (bleService.gattArray[1] == null) {
+                                bicepUI.connect.setBackgroundResource(R.drawable.chestwhite);
+                            }
+                            if (bleService.gattArray[2] == null) {
+                                wristUI.connect.setBackgroundResource(R.drawable.chestwhite);
+                            }
+                            if (bleService.gattArray[3] == null) {
+                                handUI.connect.setBackgroundResource(R.drawable.handwhite);
+                            }
                         }
                     });
                 }
@@ -440,408 +316,299 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    Runnable fireflyDebounce = new Runnable(){
+    Runnable debounceWrite = new Runnable() {
         @Override
-        public void run(){
-            statusVariables.stimming = false;
-        }
-    };
-    Runnable debounceWrite = new Runnable(){
-        @Override
-        public void run(){
+        public void run() {
             writeDebounce = false;
         }
     };
-    Runnable doubleClick = new Runnable(){
+    //todo update for all sensors.  not a big problem for now.
+    Runnable doubleClick = new Runnable() {
         @Override
-        public void run(){
-            footClickCount = 0;
-            kneeClickCount = 0;
-            hipClickCount = 0;
+        public void run() {
+            clickCount[0] = 0;
         }
     };
-
-    public void connectThigh(View v){
-        if(bleService.hipGatt == null){
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    setSensorStatus("Searching");
-                    hipUI.connect.setBackgroundResource(R.drawable.hipyellow);
-                    if(bleService.kneeGatt ==  null){kneeUI.connect.setBackgroundResource(R.drawable.kneewhite);}
-                    if(bleService.ankleGatt ==  null){ankleUI.connect.setBackgroundResource(R.drawable.anklewhite);}
-                }
-            });
-            bleService.searchingHip = true;
-            bleService.searchingKnee = false;
-            bleService.searchingAnkle = false;
-            bleService.searchingPCM = false;
-            bleService.scanner.startScan(bleService.mScanCallback);
-            scanCount = scanCount + 20;
-            bleService.scanning = true;
-            timerHandler.postDelayed(scanStop, 1000);
-        }
-        else {
-            hipClickCount++;
-            timerHandler.postDelayed(doubleClick, 500);
-            if (hipClickCount == 2) {
-                bleService.hipGatt.disconnect();
-                bleService.hipGatt.close();
-                bleService.hipGatt = null;
-                setSensorStatus("Sensor disconnected");
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        hipUI.connect.setBackgroundResource(R.drawable.hipwhite);
-                        hipUI.leftTV.setVisibility(View.INVISIBLE);
-                        hipUI.rightTV.setVisibility(View.INVISIBLE);
-                    }
-                });
-                hipClickCount = 0;
-            }
+    public void connectChest(View v){
+        if(bleService.gattArray[0]==null) {
+            searchForSensor(chestUI, 0);
+        }else{
+            disconnectSensor(chestUI,0);
         }
     }
-    public void connectLowerLeg(View v){
-        if(bleService.kneeGatt ==  null) {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    setSensorStatus("Searching");
-                    kneeUI.connect.setBackgroundResource(R.drawable.kneeyellow);
-                    if(bleService.ankleGatt ==  null){ankleUI.connect.setBackgroundResource(R.drawable.anklewhite);}
-                    if(bleService.hipGatt ==  null){hipUI.connect.setBackgroundResource(R.drawable.hipwhite);}
-                }
-            });
-            bleService.searchingKnee = true;
-            bleService.searchingHip = false;
-            bleService.searchingAnkle = false;
-            bleService.searchingPCM = false;
-            bleService.scanner.startScan(bleService.mScanCallback);
-            scanCount = scanCount + 20;
-            bleService.scanning = true;
-            timerHandler.postDelayed(scanStop, 1000);
+    public void connectBicep(View v){
+        if(bleService.gattArray[1]==null) {
+            searchForSensor(chestUI, 1);
+        }else{
+            disconnectSensor(chestUI,1);
         }
-        else{
-            kneeClickCount++;
-            timerHandler.postDelayed(doubleClick,500);
-            if(kneeClickCount == 2){
-                bleService.kneeGatt.disconnect();
-                bleService.kneeGatt.close();
-                bleService.kneeGatt = null;
-                setSensorStatus("Sensor disconnected");
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        kneeUI.connect.setBackgroundResource(R.drawable.kneewhite);
-                        kneeUI.leftTV.setVisibility(View.INVISIBLE);
-                        kneeUI.rightTV.setVisibility(View.INVISIBLE);
-                    }
-                });
-                kneeClickCount = 0;
-            }
+    }
+    public void connectWrist(View v){
+        if(bleService.gattArray[2]==null) {
+            searchForSensor(wristUI, 2);
+        }else{
+            disconnectSensor(wristUI,2);
         }
+    }
+    public void connectHand(View v){
+        if(bleService.gattArray[3]==null) {
+            searchForSensor(handUI, 3);
+        }else{
+            disconnectSensor(handUI,3);
+        }
+    }
+    //Sends to bicep flex screen
+    public void startBicepFlex(View v){
+        Intent intent=new Intent(this,BicepFlexMeasurement.class);
+        startActivity(intent);
+
+    }
+    public void startShoulderAbduction(View v){
+        Intent intent=new Intent(this,ShoulderAbduction.class);
+        startActivity(intent);
+
+    }
+    public void startShoulderFlexion(View v){
+        Intent intent=new Intent(this,ShoulderFlexion.class);
+        startActivity(intent);
+
+    }
+    public void startShoulderRotation(View v){
+        Intent intent=new Intent(this,ShoulderRotation.class);
+        startActivity(intent);
+
+    }
+    public void startWristSupination(View v){
+        Intent intent=new Intent(this,SupinationMeasurement.class);
+        startActivity(intent);
+
+    }
+    public void startWristDeflection(View v){
+        Intent intent=new Intent(this,WristDeflection.class);
+        startActivity(intent);
+
+    }
+    public void startWristFlexion(View v){
+        Intent intent=new Intent(this,WristFlexion.class);
+        startActivity(intent);
 
     }
 
-    public void connectFoot(View v){
-        if(bleService.ankleGatt == null) {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    setSensorStatus("Searching");
-                    ankleUI.connect.setBackgroundResource(R.drawable.ankleyellow);
-                    if(bleService.hipGatt ==  null){hipUI.connect.setBackgroundResource(R.drawable.hipwhite);}
-                    if(bleService.kneeGatt ==  null){kneeUI.connect.setBackgroundResource(R.drawable.kneewhite);}
-                }
-            });
-            bleService.searchingHip = false;
-            bleService.searchingKnee = false;
-            bleService.searchingAnkle = true;
-            bleService.searchingPCM = false;
-            bleService.scanner.startScan(bleService.mScanCallback);
-            scanCount = scanCount + 20;
-            bleService.scanning = true;
-            timerHandler.postDelayed(scanStop, 1000);
+    public void searchForSensor(SensorUI sensor,int position){
+        Log.v(tag,"Looking For Sensor");
+        setSensorStatus("Searching");
+        bleService.searchingChest = false;
+        bleService.searchingBicep = false;
+        bleService.searchingWrist = false;
+        bleService.searchingPCM = false;
+        if(position==0){
+            chestUI.connect.setBackgroundResource(R.drawable.chestyellow);
+            bleService.searchingChest = true;
+        }else if(position==1){
+            bicepUI.connect.setBackgroundResource(R.drawable.bicepyellow);
+            bleService.searchingBicep = true;
+        }else if(position==2){
+            wristUI.connect.setBackgroundResource(R.drawable.wristyellow);
+            bleService.searchingWrist = true;
+        }else if(position==3){
+            handUI.connect.setBackgroundResource(R.drawable.handyellow);
+            bleService.searchingHand = true;
         }
-        else{
-            footClickCount++;
-            timerHandler.postDelayed(doubleClick,500);
-            if(footClickCount == 2){
-                bleService.ankleGatt.disconnect();
-                bleService.ankleGatt.close();
-                bleService.ankleGatt = null;
-                setSensorStatus("Sensor disconnected");
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        ankleUI.connect.setBackgroundResource(R.drawable.anklewhite);
-                        ankleUI.leftTV.setVisibility(View.INVISIBLE);
-                        ankleUI.rightTV.setVisibility(View.INVISIBLE);
-                    }
-                });
-                footClickCount = 0;
-            }
-        }
+        bleService.scanner.startScan(bleService.mScanCallback);
+        scanCount = scanCount + 20;
+        bleService.scanning = true;
+        timerHandler.postDelayed(scanStop, 1000);
     }
 
-    private BroadcastReceiver broadcastReceiver =  new BroadcastReceiver() {
+    private void disconnectSensor(SensorUI sensor, int position){
+        clickCount[position]++;
+        timerHandler.postDelayed(doubleClick, 500);
+        if (clickCount[position] >= 2) {
+            bleService.gattArray[position].disconnect();
+            bleService.gattArray[position].close();
+            bleService.gattArray[position] = null;
+            setSensorStatus("Sensor disconnected");
+            sensor.connect.setBackgroundResource(R.drawable.chestwhite);
+            clickCount[position] = 0;
+        }
+    }
+//do stuff when the BT broadcast tells it to
+    //z axis goes from 0 to 360, x and y from -180 to 180 I think
+    //make a clone of this in the flex measurement
+    private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
+            //Log.v(tag,"Got bundle of things");
             Bundle extras = intent.getExtras();
             String eventType = extras.getString("bleEvent");
-            if(eventType.equals("sensorConnected")){
-                if(extras.getString("gatt").equals("hip")){
-                    connectSensor(hipUI);
-                    hipUI.connect.setOnLongClickListener(new View.OnLongClickListener(){
+            //Log.v(tag,"Event type is "+eventType);
+            if (eventType.equals("sensorConnected")) {
+                //Log.v(tag,"Sensor is connected event");
+                if (extras.getString("gatt").equals("chest")) {
+                    //Log.v(tag,"Chest connected");
+                    connectSensor(chestUI);
+                    chestUI.connect.setOnLongClickListener(new View.OnLongClickListener() {
                         @Override
-                        public boolean onLongClick(View v){
-                            hipUI.calibrateSensor(hipUI);
+                        public boolean onLongClick(View v) {
+                            chestUI.initializeSensor();
+                            return true;
+                        }
+                    });
+                }else if(extras.getString("gatt").equals("bicep")){
+                    //Log.v(tag, "Bicep connected");
+                    connectSensor(bicepUI);
+                    bicepUI.connect.setOnLongClickListener(new View.OnLongClickListener() {
+                        @Override
+                        public boolean onLongClick(View v) {
+                            bicepUI.initializeSensor();
+                            return true;
+                        }
+                    });
+                }else if(extras.getString("gatt").equals("wrist")){
+                    //Log.v(tag, "Wrist connected");
+                    connectSensor(wristUI);
+                    wristUI.connect.setOnLongClickListener(new View.OnLongClickListener() {
+                        @Override
+                        public boolean onLongClick(View v) {
+                            wristUI.initializeSensor();
+                            return true;
+                        }
+                    });
+                }else if(extras.getString("gatt").equals("hand")){
+                    //Log.v(tag, "Hand connected");
+                    connectSensor(handUI);
+                    handUI.connect.setOnLongClickListener(new View.OnLongClickListener() {
+                        @Override
+                        public boolean onLongClick(View v) {
+                            handUI.initializeSensor();
                             return true;
                         }
                     });
                 }
-                if(extras.getString("gatt").equals("knee")){
-                    connectSensor(kneeUI);
-                    kneeUI.connect.setOnLongClickListener(new View.OnLongClickListener(){
-                        @Override
-                        public boolean onLongClick(View v){
-                            kneeUI.calibrateSensor(kneeUI);
-                            return true;
-                        }
-                    });
-                }
-                if(extras.getString("gatt").equals("ankle")){
-                    connectSensor(ankleUI);
-                    ankleUI.connect.setOnLongClickListener(new View.OnLongClickListener(){
-                        @Override
-                        public boolean onLongClick(View v){
-                            ankleUI.calibrateSensor(ankleUI);
-                            return true;
-                        }
-                    });
-                }
-                if(extras.getString("gatt").equals("firefly")){
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            stimButton.setVisibility(View.VISIBLE);
-                            setSensorStatus("PCM Connected");
-                            stimButton.setImageResource(R.drawable.ic_flash_on_24dp);
-                        }
-                    });
-                }
+
                 if (extras.getString("gatt").equals("unknown")) {
-                    Log.v(TAG, "unknown gatt");
+                    //Log.v(tag, "unknown BT connected");
                 }
-                Log.v("bleService", "connected message sent");
+                //Log.v("bleService", "connected message sent");
             }
-            if(eventType.equals("sensorDisconnected")){
-                if(extras.getString("gatt").equals("hip")){
-                    onSensorDisconnected(hipUI);
-                    if(bleService.hipGatt != null){
-                        bleService.hipGatt.close();
-                        bleService.hipGatt = null;
+            if (eventType.equals("sensorDisconnected")) {
+               // Log.v(tag, "Disconnected sensor event");
+                if (extras.getString("gatt").equals("chest")) {
+                    Log.v(tag, "Chest disconnected");
+                    onSensorDisconnected(chestUI);
+                    if (bleService.gattArray[0] != null) {
+                        bleService.gattArray[0].close();
+                        bleService.gattArray[0] = null;
+                    }
+
+                }else if(extras.getString("gatt").equals("bicep")) {
+                   // Log.v(tag, "Bicep disconnected");
+                    onSensorDisconnected(bicepUI);
+                    if (bleService.gattArray[1] != null) {
+                        bleService.gattArray[1].close();
+                        bleService.gattArray[1] = null;
+                    }
+
+                }else if(extras.getString("gatt").equals("wrist")) {
+                    //Log.v(tag, "Wrist disconnected");
+                    onSensorDisconnected(wristUI);
+                    if (bleService.gattArray[2] != null) {
+                        bleService.gattArray[2].close();
+                        bleService.gattArray[2] = null;
+                    }
+
+                }else if(extras.getString("gatt").equals("hand")) {
+                    //Log.v(tag, "Hand disconnected");
+                    onSensorDisconnected(handUI);
+                    if (bleService.gattArray[3] != null) {
+                        bleService.gattArray[3].close();
+                        bleService.gattArray[3] = null;
                     }
 
                 }
-                if(extras.getString("gatt").equals("knee")){
-                    onSensorDisconnected(kneeUI);
-                    if(bleService.kneeGatt != null){
-                        bleService.kneeGatt.close();
-                        bleService.kneeGatt = null;
-                    }
-                }
-                if(extras.getString("gatt").equals("ankle")){
-                    onSensorDisconnected(ankleUI);
-                    if(bleService.ankleGatt != null){
-                        bleService.ankleGatt.close();
-                        bleService.ankleGatt = null;
-                    }
-                }
-                if(extras.getString("gatt").equals("firefly")){
-                    setSensorStatus("PCM Disconnected");
-                    if(bleService.fireflyGatt != null){
-                        bleService.fireflyGatt.close();
-                        bleService.fireflyGatt = null;
-                        stimButton.setImageResource(R.drawable.ic_flash_off_black_24dp);
-                    }
-                }
-            }
-            if(eventType.equals("notification")){
-                BleNotification notification = intent.getParcelableExtra("notifyObject");
-                if(notification.gatt.equals("hip")){
-                    findGaugeValue(hipUI,notification.value);
-                }
-                else if(notification.gatt.equals("knee")){
-                    findGaugeValue(kneeUI,notification.value);
-                }
-                else if(notification.gatt.equals("ankle")){
-                    findGaugeValue(ankleUI,notification.value);
-                }
-                /*if(extras.getString("gatt").equals("hip")){
-                    Float value = extras.getFloat("value");
-                    findGaugeValue(hipUI,value);
-                }
-                if(extras.getString("gatt").equals("knee")){
-                    Float value = extras.getFloat("value");
-                    findGaugeValue(kneeUI,value);
-                }
-                if(extras.getString("gatt").equals("ankle")){
-                    Float value = extras.getFloat("value");
-                    findGaugeValue(ankleUI,value);
-                }*/
-            }
-            if(eventType.equals("fireflyConnected")){
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        stimButton.setVisibility(View.VISIBLE);
-                        setSensorStatus("PCM Connected");
-                        stimButton.setImageResource(R.drawable.ic_flash_on_24dp);
-                    }
-                });
-            }
-        }
-    };
-    private void connectSensor(final SensorUI sensor){
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                setSensorStatus("Sensor Connected");
-                sensor.connect.setBackgroundResource(sensor.green);
-                sensor.rightTV.setVisibility(View.VISIBLE);
-                sensor.leftTV.setVisibility(View.VISIBLE);
-            }
-        });
-    }
-    private void onSensorDisconnected(final SensorUI sensor){
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                sensor.leftPB.setProgress(0);
-                sensor.rightPB.setProgress(0);
-                sensor.rightTV.setVisibility(View.INVISIBLE);
-                sensor.leftTV.setVisibility(View.INVISIBLE);
-                sensor.connect.setBackgroundResource(sensor.white);
-                sensor.relativeLayout.setBackgroundColor(Color.parseColor("#404040"));
-            }
-        });
-        setSensorStatus("Sensor Disconnected");
-        Log.v("BLUETOOTH", "DISCONNECTED");
-    }
-
-    public void startDetails(View v){
-        Intent intent = new Intent(this, DetailsActivity.class);
-        if (bleService.ankleGatt != null){
-            String ankleDeviceAddress = bleService.ankleGatt.getDevice().getAddress().toString();
-            intent.putExtra("ankleDeviceAddress", ankleDeviceAddress);
-        }
-        else{
-            String string = "not connected";
-            intent.putExtra("ankleDeviceAddress", string);
-        }
-        if(bleService.kneeGatt != null){
-            String kneeDeviceAddress = bleService.kneeGatt.getDevice().getAddress().toString();
-            intent.putExtra("kneeDeviceAddress", kneeDeviceAddress);
-        }
-        else{
-            String string = "not connected";
-            intent.putExtra("kneeDeviceAddress", string);
-        }
-        if(bleService.hipGatt != null){
-            String hipDeviceAddress = bleService.hipGatt.getDevice().getAddress().toString();
-            intent.putExtra("hipDeviceAddress", hipDeviceAddress);
-        }
-        else{
-            String string = "not connected";
-            intent.putExtra("hipDeviceAddress", string);
-        }
-        startActivity(intent);
-    }
-    public void findGaugeValue(final SensorUI sensor, float gyroX){
-        if(sensor.calibrate & sensor.calibrateCounter < 10){
-            sensor.calibrateCounter++;
-            sensor.average = sensor.average + gyroX;
-        }
-        else if (sensor.calibrate & sensor.calibrateCounter == 10){
-            sensor.average = sensor.average/10;
-            sensor.calibrateCounter++;
-        }
-        else if (sensor.calibrate & sensor.calibrateCounter > 10){
-            if((sensor.average+90.0) <= 180 & (sensor.average - 90) >= -180){
-                checkValue((int)(gyroX + (-1*sensor.average)), sensor);
-                setGaugeValue((int)(gyroX + (-1*sensor.average)), sensor);
-                int correctedValue = (int)(gyroX + (-1*sensor.average));
-            }
-            else if((sensor.average+90) > 180){
-                if (gyroX < 0 ){
-                    checkValue((int)((180 - sensor.average) + (gyroX + 180)),sensor);
-                    setGaugeValue((int)((180 - sensor.average) + (gyroX + 180)),sensor);
-                    int correctedValue = (int)((180 - sensor.average) + (gyroX + 180));
-                }
-                else if(gyroX > 0){
-                    checkValue((int)(gyroX + (-1*sensor.average)), sensor);
-                    setGaugeValue((int)(gyroX + (-1*sensor.average)), sensor);
-                    int correctedValue = (int)(gyroX + (-1*sensor.average));
-                }
-            }
-            else if((sensor.average-90) < -180){
-                if(gyroX < 0 ){
-                    checkValue((int)(gyroX + (-1*sensor.average)), sensor);
-                    setGaugeValue((int)(gyroX + (-1*sensor.average)), sensor);
-                    int correctedValue = (int)(gyroX + (-1*sensor.average));
-                }
-                if(gyroX > 0){
-                    checkValue((int)((-180 - sensor.average) + (gyroX - 180)), sensor);
-                    setGaugeValue((int)((-180 - sensor.average) + (gyroX - 180)), sensor);
-                    int correctedValue = (int)((-180 - sensor.average) + (gyroX - 180));
-                }
-            }
-        }
-    }
-    public void writeFile(){
-        try {
-            if(!fileCreated){
-                FileOutputStream outputStream = new FileOutputStream(fullPath);
-                string = "file created on: " + dateTime + "\n";
-                outputStream.write(string.getBytes());
-                outputStream.flush();
-                outputStream.close();
-                fileCreated = true;
-            }
-            else{
-                FileOutputStream outputStream = new FileOutputStream(fullPath, true);
-                outputStream.write(dateTime.getBytes());
-                outputStream.flush();
-                outputStream.close();
-                MediaScannerConnection.scanFile(getAppContext(),new String[]{fullPath},null,null);
             }
 
-        } catch (Exception e) {
-            e.printStackTrace();
+                if (eventType.equals("notification")) {
+                    //Log.v(tag,"You have mail event");
+                    BleNotification notification = intent.getParcelableExtra("notifyObject");
+                    //notification object is null for wrist, but works normally for chest...
+                    // Log.v(tag, "notification gatt is "+notification.gatt);
+                    if (notification.gatt.equals("chest")) {
+                       // Log.v(tag," from the chest");
+                        //find value x, switched to different value coding
+                       // Log.v(tag, "Value x from object is "+notification.valueX);
+                        setGaugeValue((int)notification.valueX,chestUI,0);
+                        //find value y, switched to different value coding
+                      //  Log.v(tag, "Value y from object is "+notification.valueY);
+                        setGaugeValue((int)notification.valueY,chestUI,1);
+                        //find value z, switched to different value coding
+                      //  Log.v(tag, "Value z from object is "+notification.valueZ);
+                        setGaugeValue((int)notification.valueZ,chestUI,2);
+
+                    }else if(notification.gatt.equals("bicep")) {
+                      //  Log.v(tag, " from the bicep");
+                        //find value x, switched to different value coding
+                      //  Log.v(tag, "Value x from object is " + notification.valueX);
+                        setGaugeValue((int) notification.valueX, bicepUI, 0);
+                        //find value y, switched to different value coding
+                       // Log.v(tag, "Value y from object is " + notification.valueY);
+                        setGaugeValue((int) notification.valueY, bicepUI, 1);
+                        //find value z, switched to different value coding
+                      //  Log.v(tag, "Value z from object is " + notification.valueZ);
+                        setGaugeValue((int)notification.valueZ,bicepUI,2);
+                    }else if(notification.gatt.equals("wrist")) {
+                       // Log.v(tag, " from the wrist");
+                        //find value x, switched to different value coding
+                      //  Log.v(tag, "Value x from object is " + notification.valueX);
+                        setGaugeValue((int) notification.valueX, wristUI, 0);
+                        //find value y, switched to different value coding
+                      //  Log.v(tag, "Value y from object is " + notification.valueY);
+                        setGaugeValue((int) notification.valueY, wristUI, 1);
+                        //find value z, switched to different value coding
+                       // Log.v(tag, "Value z from object is " + notification.valueZ);
+                        setGaugeValue((int)notification.valueZ,wristUI,2);
+                    }
+                    else if(notification.gatt.equals("hand")){
+                       // Log.v(tag," from the hand");
+                        //find value x, switched to different value coding
+                       // Log.v(tag, "Value x from object is "+notification.valueX);
+                        setGaugeValue((int)notification.valueX,handUI,0);
+                        //find value y, switched to different value coding
+                       // Log.v(tag, "Value y from object is "+notification.valueY);
+                        setGaugeValue((int)notification.valueY,handUI,1);
+                        //find value z, switched to different value coding
+                       // Log.v(tag, "Value z from object is "+notification.valueZ);
+                        setGaugeValue((int)notification.valueZ,handUI,2);
+                    }
+
+                }
+            }
+        };
+
+        private void connectSensor(final SensorUI sensor) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    setSensorStatus("Sensor Connected");
+                    sensor.connect.setBackgroundResource(sensor.green);
+                }
+            });
+        }
+
+        private void onSensorDisconnected(final SensorUI sensor) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    for(int i=0;i<sensor.progressBars.length;i++){
+                        for(int ii=0;ii<sensor.progressBars[0].length;ii++){
+                            sensor.progressBars[i][ii].setProgress(0);
+                        }
+                    }
+                    sensor.connect.setBackgroundResource(sensor.white);
+                    sensor.setSensorBackgroundColor("#404040");
+                }
+            });
+            setSensorStatus("Sensor Disconnected");
+            //Log.v("BLUETOOTH", "DISCONNECTED");
         }
     }
-
-    public void writeFileAtStop(String string, SensorUI sensor){
-        try {
-                FileOutputStream outputStream = new FileOutputStream(fullPath, true);
-                String data = string;
-                if(sensor == hipUI){
-                        data = data.concat(hipData.toString() + ";\n");
-                }
-                if(sensor == kneeUI){
-                        data = data.concat(kneeData.toString() + ";\n");
-                }
-                if(sensor == ankleUI){
-                        data = data.concat(ankleData.toString() + ";\n");
-                }
-                outputStream.write(data.getBytes());
-                outputStream.flush();
-                outputStream.close();
-                MediaScannerConnection.scanFile(getAppContext(),new String[]{fullPath},null,null);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-}
